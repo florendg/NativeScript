@@ -26,33 +26,10 @@ const PFLAG_LAYOUT_REQUIRED = 1 << 2;
 
 const majorVersion = iosUtils.MajorVersion;
 
-class UIPopoverPresentationControllerDelegateImp extends NSObject implements UIPopoverPresentationControllerDelegate {
-    public static ObjCProtocols = [UIPopoverPresentationControllerDelegate];
-
-    private _ownerRef: WeakRef<View>;
-
-    public static initWithOwner(owner: WeakRef<View>): UIPopoverPresentationControllerDelegateImp {
-        const instance = <UIPopoverPresentationControllerDelegateImp>super.new();
-        instance._ownerRef = owner;
-
-        return instance;
-    }
-
-    public popoverPresentationControllerDidDismissPopover(popoverPresentationController: UIPopoverPresentationController) {
-        let ownerView = this._ownerRef.get();
-        if (ownerView) {
-            let modalClosingArgs: EventData = <EventData>{
-                eventName: ViewCommon.popoverClosedEvent,
-            };
-            ownerView.notify(modalClosingArgs);
-        }
-    }
-}
-
 export class View extends ViewCommon {
     nativeViewProtected: UIView;
     viewController: UIViewController;
-    private _popoverPresentationDelegate: UIPopoverPresentationControllerDelegateImp; 
+    private _popoverPresentationDelegate: ios.UIPopoverPresentationControllerDelegateImp;
 
     private _isLaidOut = false;
     private _hasTransfrom = false;
@@ -67,7 +44,7 @@ export class View extends ViewCommon {
      */
     _nativeBackgroundState: "unset" | "invalid" | "drawn";
 
-    constructor () {
+    constructor() {
         super();
         this.on(ViewCommon.popoverClosedEvent, this.closeModal.bind(this));
     }
@@ -445,7 +422,7 @@ export class View extends ViewCommon {
 
             if (presentationStyle === UIModalPresentationStyle.Popover) {
                 const popoverPresentationController = controller.popoverPresentationController;
-                this._popoverPresentationDelegate = UIPopoverPresentationControllerDelegateImp.initWithOwner(new WeakRef(this));
+                this._popoverPresentationDelegate = ios.UIPopoverPresentationControllerDelegateImp.initWithOwner(new WeakRef(this));
                 popoverPresentationController.delegate = this._popoverPresentationDelegate;
                 const view = parent.nativeViewProtected;
                 // Note: sourceView and sourceRect are needed to specify the anchor location for the popover.
@@ -946,7 +923,7 @@ export namespace ios {
 
         public viewDidLoad(): void {
             super.viewDidLoad();
-    
+
             // Unify translucent and opaque bars layout
             // this.edgesForExtendedLayout = UIRectEdgeBottom;
             this.extendedLayoutIncludesOpaqueBars = true;
@@ -1019,6 +996,29 @@ export namespace ios {
             const owner = this.owner.get();
             if (owner && !owner.parent) {
                 owner.callUnloaded();
+            }
+        }
+    }
+
+    export class UIPopoverPresentationControllerDelegateImp extends NSObject implements UIPopoverPresentationControllerDelegate {
+        public static ObjCProtocols = [UIPopoverPresentationControllerDelegate];
+
+        private owner: WeakRef<View>;
+
+        public static initWithOwner(owner: WeakRef<View>): UIPopoverPresentationControllerDelegateImp {
+            const instance = <UIPopoverPresentationControllerDelegateImp>super.new();
+            instance.owner = owner;
+
+            return instance;
+        }
+
+        public popoverPresentationControllerDidDismissPopover(popoverPresentationController: UIPopoverPresentationController) {
+            const owner = this.owner.get();
+            if (owner) {
+                let modalClosingArgs: EventData = <EventData>{
+                    eventName: ViewCommon.popoverClosedEvent,
+                };
+                owner.notify(modalClosingArgs);
             }
         }
     }
